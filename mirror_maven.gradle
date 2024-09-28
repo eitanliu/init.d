@@ -1,5 +1,5 @@
-// 复制这个文件到用户目录的.gradle目录，改名为init.gradle
-// ~/.gradle/init.gradle
+// copy to ~/.gradle/init.d/
+// 复制这个文件到用户目录下的.gradle/init.d/
 ext {
     def GOOGLE_URL = 'https://dl.google.com'
     def CENTER_URL = 'https://repo.maven.apache.org/maven2'
