@@ -1,8 +1,6 @@
 Closure<Class> classForName = { String className, ClassLoader classLoader = null ->
     try {
-        if (classLoader != null) {
-            return Class.forName(className, true, classLoader)
-        } else Class.forName(className)
+        return classLoader != null ? Class.forName(className, true, classLoader) : Class.forName(className)
     } catch (Throwable e) {
         e.printStackTrace()
     }
@@ -14,7 +12,9 @@ boolean hasGradleVersion = null != clazz
 if (hasGradleVersion) {
     def currentMethod = clazz.getMethod("current")
     def versionMethod = clazz.getMethod("version", String.class)
-    if(currentMethod.invoke(null) >= versionMethod.invoke(null, '8.0')) {
+    def current = currentMethod.invoke(null)
+    println("GradleVersion current $current")
+    if (current >= versionMethod.invoke(null, '8.0')) {
         apply from: "gradle8/cache_settings.gradle"
     }
 }

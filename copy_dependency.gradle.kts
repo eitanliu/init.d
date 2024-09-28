@@ -1,4 +1,5 @@
 // apply(from = "copy_dependency.gradle.kts")
+// apply from: "repo_maven.gradle"
 fun classForName(className: String, classLoader: ClassLoader? = null): Class<*>? {
     return try {
         if (classLoader != null) {

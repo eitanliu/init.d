@@ -51,7 +51,7 @@ ext {
     }
 
     mirrorOrigin = mirrorRepo.keySet().collect {
-        println "mirrorRepo item $it -> ${mirrorRepo[it]}"
+        println "repo_mirror item $it -> ${mirrorRepo[it]}"
         [it.replaceFirst("http://", "").replaceFirst("https://", ""), it]
     }
 }
@@ -82,10 +82,10 @@ allprojects {
     def flutterProjectRoot = rootProject.projectDir.parentFile
     def pluginsFile = new File(flutterProjectRoot, '.flutter-plugins')
     def isFlutterProject = pluginsFile.exists()
-    def mirrorEnable = Boolean.valueOf(findProperty("mirror_maven_enable")?.toString() ?: "true");
+    def mirrorEnable = Boolean.valueOf(findProperty("repo_mirror_enable")?.toString() ?: "true");
 
     //mirrorEnable = mirrorEnable || isFlutterProject
-    project.logger.lifecycle "$project mirror_maven_enable $mirrorEnable"
+    project.logger.lifecycle "$project repo_mirror_enable $mirrorEnable"
 
     handleMirrorRepo(repositories, mirrorEnable, project, "all")
 
@@ -98,7 +98,7 @@ allprojects {
 gradle.beforeSettings { settings ->
     // println "beforeSettings ${settings.properties}"
     // def mirrorEnable = true;
-    def mirrorEnable = Boolean.valueOf(settings.properties.getOrDefault("mirror_maven_enable", "true") as String);
+    def mirrorEnable = Boolean.valueOf(settings.properties.getOrDefault("repo_mirror_enable", "true") as String);
     handleMirrorRepo(settings.pluginManagement.repositories, mirrorEnable, null, "pluginManagement")
     // 6.8 及更高版本执行 DependencyResolutionManagement 配置
     // dependencyResolutionManagement.repositories

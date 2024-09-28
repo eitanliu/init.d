@@ -1,0 +1,61 @@
+// copy to ~/.gradle/init.d/
+Closure handleAddRepo = { RepositoryHandler handler, URI repositoryUri, boolean enable, Project project, String tag = "all" ->
+    if (enable && !handler.any { ArtifactRepository repo ->
+        if (enable && repo instanceof MavenArtifactRepository) {
+            return repositoryUri == repo.url
+        } else return false
+    }) {
+        handler.maven {
+
+            url = repositoryUri
+        }
+        println "repo_maven_add $project $tag: $repositoryUri."
+    }
+}
+
+def mavenLocalPath = [".m2", "repository"].join(File.separator)
+def mavenLocalUri = new File(System.getProperty("user.home"), mavenLocalPath).toURI()
+
+allprojects {
+    def rootBuildUri = project.rootProject.layout.buildDirectory.file("repository").get().asFile.toURI()
+    def projectBuildUri = project.layout.buildDirectory.file("repository").get().asFile.toURI()
+    def mavenLocalEnable = Boolean.valueOf(findProperty("repo_maven_local")?.toString() ?: "true")
+    def rootBuildEnable = Boolean.valueOf(findProperty("repo_maven_root_build")?.toString() ?: "false")
+    def projectBuildEnable = Boolean.valueOf(findProperty("repo_maven_project_build")?.toString() ?: "false")
+
+    project.logger.lifecycle "$project repo_maven_local $mavenLocalEnable"
+    project.logger.lifecycle "$project repo_maven_root_build $rootBuildEnable"
+    project.logger.lifecycle "$project repo_maven_project_build $projectBuildEnable"
+
+    handleAddRepo(repositories, mavenLocalUri, mavenLocalEnable, project, "all")
+    handleAddRepo(repositories, rootBuildUri, rootBuildEnable, project, "all")
+    handleAddRepo(repositories, projectBuildUri, projectBuildEnable, project, "all")
+
+    buildscript {
+
+        handleAddRepo(repositories, mavenLocalUri, mavenLocalEnable, project, "buildscript")
+        handleAddRepo(repositories, rootBuildUri, rootBuildEnable, project, "buildscript")
+        handleAddRepo(repositories, projectBuildUri, projectBuildEnable, project, "buildscript")
+    }
+}
+
+gradle.beforeSettings { Settings settings ->
+    // println "beforeSettings ${settings.properties}, ${settings.rootProject}"
+    def rootBuildUri = new File(settings.rootProject.projectDir, ["build", "repository"].join(File.separator)).toURI()
+
+    def mavenLocalEnable = Boolean.valueOf(settings.properties.getOrDefault("repo_maven_local", "true") as String)
+    def rootBuildEnable = Boolean.valueOf(settings.properties.getOrDefault("repo_maven_root_build", "false") as String)
+    def pluginRepositories = settings.pluginManagement.repositories
+    handleAddRepo(pluginRepositories, mavenLocalUri, mavenLocalEnable, null, "pluginManagement")
+    handleAddRepo(pluginRepositories, rootBuildUri, rootBuildEnable, null, "pluginManagement")
+
+    // dependencyResolutionManagement.repositories
+    if (gradle.gradleVersion >= "6.8") {
+        def getMethod = settings.class.getDeclaredMethod("getDependencyResolutionManagement")
+        def dependencyResolutionManagement = getMethod.invoke(settings)
+        def repositoriesMethod = dependencyResolutionManagement.class.getDeclaredMethod("getRepositories")
+        def repositories = repositoriesMethod.invoke(dependencyResolutionManagement) as RepositoryHandler
+        handleAddRepo(repositories, mavenLocalUri, mavenLocalEnable, null, "dependencyResolutionManagement")
+        handleAddRepo(repositories, rootBuildUri, rootBuildEnable, null, "dependencyResolutionManagement")
+    }
+}
