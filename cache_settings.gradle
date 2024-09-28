@@ -1,0 +1,20 @@
+Closure<Class> classForName = { String className, ClassLoader classLoader = null ->
+    try {
+        if (classLoader != null) {
+            return Class.forName(className, true, classLoader)
+        } else Class.forName(className)
+    } catch (Throwable e) {
+        e.printStackTrace()
+    }
+    return null
+}
+
+Class clazz = classForName("org.gradle.util.GradleVersion")
+boolean hasGradleVersion = null != clazz
+if (hasGradleVersion) {
+    def currentMethod = clazz.getMethod("current")
+    def versionMethod = clazz.getMethod("version", String.class)
+    if(currentMethod.invoke(null) >= versionMethod.invoke(null, '8.0')) {
+        apply from: "gradle8/cache_settings.gradle"
+    }
+}
