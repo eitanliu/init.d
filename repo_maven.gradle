@@ -5,11 +5,13 @@ Closure handleAddRepo = { RepositoryHandler handler, URI repositoryUri, boolean 
             return repositoryUri == repo.url
         } else return false
     }) {
-        handler.maven {
-
-            url = repositoryUri
+        try {
+            handler.maven { url = repositoryUri }
+            println "repo_maven_add $project $tag: $repositoryUri."
+        } catch (Throwable e) {
+            println "repo_maven_error $project $tag: $repositoryUri."
+            e.printStackTrace()
         }
-        println "repo_maven_add $project $tag: $repositoryUri."
     }
 }
 

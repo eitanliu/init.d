@@ -10,6 +10,20 @@ fun classForName(className: String, classLoader: ClassLoader? = null): Class<*>?
     }
 }
 
+val classGradleVersion = classForName("org.gradle.util.GradleVersion")
+var greaterVersion8 = false
+@Suppress("UNCHECKED_CAST")
+if (classGradleVersion != null) {
+    val currentMethod = classGradleVersion.getMethod("current")
+    val versionMethod = classGradleVersion.getMethod("version", String::class.java)
+    val current = currentMethod.invoke(null) as Comparable<Comparable<*>>
+    val version8 = versionMethod.invoke(null, "8.0") as Comparable<Comparable<*>>
+    if (current >= version8) {
+        greaterVersion8 = true
+    }
+    // println("GradleVersion $current, $version8, $greaterVersion8")
+}
+
 val classDefaultFileCollectionDependency: Class<*>? = classForName(
     "org.gradle.api.internal.artifacts.dependencies.DefaultFileCollectionDependency"
 )
@@ -69,9 +83,13 @@ allprojects {
                         }
                     }
                     if (it is ExternalModuleDependency) {
-                        if (it.toString().startsWith("DefaultExternalModuleDependency")) {
-                            println("ignoreDependency_DefaultExternalModuleDependency: ${it.module}:${it.version}, $it")
-                            return@filter false
+                        if (greaterVersion8 && it.toString()
+                                .startsWith("DefaultExternalModuleDependency")
+                        ) {
+                            return@filter if (greaterVersion8) {
+                                println("ignoreDependency_DefaultExternalModuleDependency: ${it.module}:${it.version}, $it")
+                                false
+                            } else true
                         }
                         if (it.toString().startsWith("DefaultMinimalDependencyVariant")) {
                             // println("ignoreDependency_DefaultMinimalDependencyVariant: ${it.module}:${it.version}")
