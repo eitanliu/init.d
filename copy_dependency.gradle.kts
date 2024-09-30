@@ -1,5 +1,16 @@
 // apply(from = "copy_dependency.gradle.kts")
 // apply from: "repo_maven.gradle"
+import org.gradle.util.GradleVersion
+
+fun parseVersion(version: String): Comparable<Comparable<*>> {
+    @Suppress("UNCHECKED_CAST")
+    return try {
+        GradleVersion.version(version) as Comparable<Comparable<*>>
+    } catch (_: Throwable) {
+        version as Comparable<Comparable<*>>
+    }
+}
+
 fun classForName(className: String, classLoader: ClassLoader? = null): Class<*>? {
     return try {
         if (classLoader != null) {
@@ -9,24 +20,6 @@ fun classForName(className: String, classLoader: ClassLoader? = null): Class<*>?
         null
     }
 }
-
-val classGradleVersion = classForName("org.gradle.util.GradleVersion")
-var greaterVersion8 = false
-@Suppress("UNCHECKED_CAST")
-if (classGradleVersion != null) {
-    val currentMethod = classGradleVersion.getMethod("current")
-    val versionMethod = classGradleVersion.getMethod("version", String::class.java)
-    val current = currentMethod.invoke(null) as Comparable<Comparable<*>>
-    val version8 = versionMethod.invoke(null, "8.0") as Comparable<Comparable<*>>
-    if (current >= version8) {
-        greaterVersion8 = true
-    }
-    // println("GradleVersion $current, $version8, $greaterVersion8")
-}
-
-val classDefaultFileCollectionDependency: Class<*>? = classForName(
-    "org.gradle.api.internal.artifacts.dependencies.DefaultFileCollectionDependency"
-)
 
 val Class<*>.allSuperClass: List<Class<*>>
     get() {
@@ -39,6 +32,17 @@ val Class<*>.allSuperClass: List<Class<*>>
         return classList
     }
 
+val gradleVersion = parseVersion(gradle.gradleVersion)
+val version8_1 = parseVersion("8.1")
+println("GradleVersion current: $gradleVersion")
+
+val interfaceMinimalExternalModuleDependency: Class<*>? = classForName(
+    "org.gradle.api.artifacts.MinimalExternalModuleDependency"
+)
+val classDefaultFileCollectionDependency: Class<*>? = classForName(
+    "org.gradle.api.internal.artifacts.dependencies.DefaultFileCollectionDependency"
+)
+
 allprojects {
 
     fun copyDependency(destDirectory: File) {
@@ -49,6 +53,21 @@ allprojects {
         val classAndroidLibraryPlugin: Class<*>? = classForName(
             "com.android.build.gradle.LibraryPlugin"
         )
+        val classpathCfg = project.rootProject.buildscript.configurations.getByName("classpath")
+        val agpVersion = parseVersion(
+            classpathCfg.dependencies.find { dependency ->
+                println("AndroidPlugin find classpath ${dependency.run { "$group:$name:$version" }}")
+                if (dependency.name == "com.android.application.gradle.plugin") {
+                    return@find true
+                } else if (dependency.name == "com.android.library.gradle.plugin") {
+                    return@find true
+                } else if (dependency.group == "com.android.tools.build" && dependency.name == "gradle") {
+                    return@find true
+                }
+                false
+            }?.version ?: gradle.gradleVersion
+        )
+        println("AndroidPluginVersion $agpVersion")
 
         val isAndroidApp = project.plugins.any { classAndroidAppPlugin?.isInstance(it) ?: false }
         val isAndroidLibrary = project.plugins.any {
@@ -83,10 +102,8 @@ allprojects {
                         }
                     }
                     if (it is ExternalModuleDependency) {
-                        if (greaterVersion8 && it.toString()
-                                .startsWith("DefaultExternalModuleDependency")
-                        ) {
-                            return@filter if (greaterVersion8) {
+                        if (it.toString().startsWith("DefaultExternalModuleDependency")) {
+                            return@filter if (agpVersion >= version8_1) {
                                 println("ignoreDependency_DefaultExternalModuleDependency: ${it.module}:${it.version}, $it")
                                 false
                             } else true
@@ -96,10 +113,9 @@ allprojects {
                         }
                     }
                     // println("resolvedDependency: $it, ${it::class.java.allSuperClass}")
-                    it is MinimalExternalModuleDependency
+                    interfaceMinimalExternalModuleDependency?.isInstance(it) ?: true
                 }.forEach { artifact ->
                     val cacheDir = artifact.file.parentFile.parentFile
-                    val cacheFiles = cacheDir.walk().filter { it.isFile }
 
                     val moduleVersionIdentifier = artifact.moduleVersion.id
                     val artifactPath = arrayOf(
@@ -109,14 +125,18 @@ allprojects {
                     val artifactDir = File(destDirectory, artifactPath.joinToString(File.separator))
                     if (!artifactDir.isDirectory) artifactDir.mkdirs()
 
+                    val cacheFiles = cacheDir.walk().filter {
+                        it.isFile && it.parentFile.path.contains(moduleVersionIdentifier.group)
+                    }
+                    println("Cache_Artifact: $name ${artifact.moduleVersion} Files: ${cacheFiles.joinToString()}")
                     cacheFiles.forEach {
                         val dest = File(artifactDir, it.name)
                         if (!dest.isFile) {
                             if (dest.exists()) dest.delete()
-                            println("Copy_Artifact: $name ${artifact.moduleVersion} Files: ${cacheFiles.joinToString()}")
+                            println("Copy_Artifact: $name ${artifact.moduleVersion} File: $it")
                             it.copyTo(dest)
                         } else {
-                            println("Exists_Artifact: $name ${artifact.moduleVersion} Files: ${cacheFiles.joinToString()}")
+                            // println("Exists_Artifact: $name ${artifact.moduleVersion} File: $it")
                         }
                     }
                 }
@@ -124,23 +144,26 @@ allprojects {
         }
     }
 
-    if (project.tasks.findByName("copyDependencyToBuild") == null) project.tasks.register("copyDependencyToBuild") {
+    if (project.tasks.findByName("copyDependencyToProject") == null) project.tasks.register("copyDependencyToProject") {
         doLast {
-            copyDependency(project.layout.buildDirectory.file("repository").get().asFile)
+            val dir = project.layout.projectDirectory.file("repository").asFile
+            copyDependency(dir)
         }
     }
 
 
-    if (project.tasks.findByName("copyDependencyToRootBuild") == null) project.tasks.register("copyDependencyToRootBuild") {
+    if (project.tasks.findByName("copyDependencyToRootProject") == null) project.tasks.register("copyDependencyToRootProject") {
         doLast {
-            copyDependency(rootProject.layout.buildDirectory.file("repository").get().asFile)
+            val dir = rootProject.layout.projectDirectory.file("repository").asFile
+            copyDependency(dir)
         }
     }
 
     if (project.tasks.findByName("copyDependencyToMavenLocal") == null) project.tasks.register("copyDependencyToMavenLocal") {
         doLast {
             val repositoryPath = arrayOf(".m2", "repository").joinToString(File.separator)
-            copyDependency(File(System.getProperty("user.home"), repositoryPath))
+            val dir = File(System.getProperty("user.home"), repositoryPath)
+            copyDependency(dir)
         }
     }
 }

@@ -1,5 +1,15 @@
 // copy to ~/.gradle/init.d/
 // 复制这个文件到用户目录下的.gradle/init.d/
+import org.gradle.util.GradleVersion
+
+Closure<Comparable> parseVersion = { String version ->
+    try {
+        return (Comparable) GradleVersion.version(version)
+    } catch (Throwable ignored) {
+    }
+    return version
+}
+
 ext {
     def GOOGLE_URL = 'https://dl.google.com'
     def CENTER_URL = 'https://repo.maven.apache.org/maven2'
@@ -102,7 +112,7 @@ gradle.beforeSettings { settings ->
     handleMirrorRepo(settings.pluginManagement.repositories, mirrorEnable, null, "pluginManagement")
     // 6.8 及更高版本执行 DependencyResolutionManagement 配置
     // dependencyResolutionManagement.repositories
-    if (gradle.gradleVersion >= "6.8") {
+    if (parseVersion(gradle.gradleVersion) >= parseVersion("6.8")) {
         def getMethod = settings.class.getDeclaredMethod("getDependencyResolutionManagement")
         def dependencyResolutionManagement = getMethod.invoke(settings)
         def repositoriesMethod = dependencyResolutionManagement.class.getDeclaredMethod("getRepositories")
