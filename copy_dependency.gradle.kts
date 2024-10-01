@@ -45,38 +45,21 @@ val classDefaultFileCollectionDependency: Class<*>? = classForName(
 
 allprojects {
 
-    fun copyDependency(destDirectory: File) {
-        val classAndroidAppPlugin: Class<*>? = classForName(
-            "com.android.build.gradle.AppPlugin"
-        )
+    fun copyDependency(
+        project: Project, destDirectory: File, plugin: Plugin<*>?,
+        agpVersion: Comparable<Comparable<*>>?, tag: String = "project",
+    ) {
+        val ignoreDefault = (project.findProperty(
+            "copy_dependency_ignore_default"
+        )?.toString() ?: "false").toBoolean()
 
-        val classAndroidLibraryPlugin: Class<*>? = classForName(
-            "com.android.build.gradle.LibraryPlugin"
-        )
-        val classpathCfg = project.rootProject.buildscript.configurations.getByName("classpath")
-        val agpVersion = parseVersion(
-            classpathCfg.dependencies.find { dependency ->
-                println("AndroidPlugin find classpath ${dependency.run { "$group:$name:$version" }}")
-                if (dependency.name == "com.android.application.gradle.plugin") {
-                    return@find true
-                } else if (dependency.name == "com.android.library.gradle.plugin") {
-                    return@find true
-                } else if (dependency.group == "com.android.tools.build" && dependency.name == "gradle") {
-                    return@find true
-                }
-                false
-            }?.version ?: gradle.gradleVersion
-        )
-        println("AndroidPluginVersion $agpVersion")
-
-        val isAndroidApp = project.plugins.any { classAndroidAppPlugin?.isInstance(it) ?: false }
-        val isAndroidLibrary = project.plugins.any {
-            classAndroidLibraryPlugin?.isInstance(it) ?: false
+        val container = if (tag == "project") {
+            project.configurations
+        } else {
+            project.buildscript.configurations
         }
-        println("copyProject: $project, $isAndroidApp, $isAndroidLibrary")
-
-        configurations.all {
-            println("configuration: $isCanBeResolved, $isCanBeConsumed, ${this.name}.")
+        container.all {
+            println("$tag.configuration: $isCanBeResolved, $isCanBeConsumed, ${this.name}.")
 
             if (isCanBeResolved && !resolvedConfiguration.hasError()) {
                 println("resolvedConfiguration: ${resolvedConfiguration.hasError()}, $resolvedConfiguration")
@@ -103,7 +86,9 @@ allprojects {
                     }
                     if (it is ExternalModuleDependency) {
                         if (it.toString().startsWith("DefaultExternalModuleDependency")) {
-                            return@filter if (agpVersion >= version8_1) {
+                            return@filter if (ignoreDefault
+                                && agpVersion != null && agpVersion >= version8_1
+                            ) {
                                 println("ignoreDependency_DefaultExternalModuleDependency: ${it.module}:${it.version}, $it")
                                 false
                             } else true
@@ -115,20 +100,26 @@ allprojects {
                     // println("resolvedDependency: $it, ${it::class.java.allSuperClass}")
                     interfaceMinimalExternalModuleDependency?.isInstance(it) ?: true
                 }.forEach { artifact ->
-                    val cacheDir = artifact.file.parentFile.parentFile
-
                     val moduleVersionIdentifier = artifact.moduleVersion.id
+                    val ignoreList = listOf("org.jetbrains.kotlin:kotlin-native-prebuilt")
+                    val moduleName = moduleVersionIdentifier.module.toString()
+                    if (moduleName in ignoreList){ 
+                        println("ignoreArtifactModule: $moduleVersionIdentifier")
+                        return@forEach
+                    }
                     val artifactPath = arrayOf(
                         *moduleVersionIdentifier.group.split(".").toTypedArray(),
                         moduleVersionIdentifier.name, moduleVersionIdentifier.version
                     )
+
                     val artifactDir = File(destDirectory, artifactPath.joinToString(File.separator))
                     if (!artifactDir.isDirectory) artifactDir.mkdirs()
 
+                    val cacheDir = artifact.file.parentFile.parentFile
                     val cacheFiles = cacheDir.walk().filter {
                         it.isFile && it.parentFile.path.contains(moduleVersionIdentifier.group)
                     }
-                    println("Cache_Artifact: $name ${artifact.moduleVersion} Files: ${cacheFiles.joinToString()}")
+                    println("Find_Artifact: $name ${artifact.moduleVersion} Files: ${cacheFiles.joinToString()}")
                     cacheFiles.forEach {
                         val dest = File(artifactDir, it.name)
                         if (!dest.isFile) {
@@ -144,18 +135,43 @@ allprojects {
         }
     }
 
+    fun copyDependency(project: Project, destDirectory: File) {
+        val classAndroidApp = project.plugins.find {
+            it::class.java.name == "com.android.build.gradle.AppPlugin"
+        }
+        val classAndroidLibrary = project.plugins.find {
+            it::class.java.name == "com.android.build.gradle.LibraryPlugin"
+        }
+        val plugin = classAndroidApp ?: classAndroidLibrary
+        val classpathCfg = project.rootProject.buildscript.configurations.getByName("classpath")
+        val agpVersion = classpathCfg.dependencies.find { dependency ->
+            println("AndroidPlugin find classpath ${dependency.run { "$group:$name:$version" }}")
+            if (dependency.name == "com.android.application.gradle.plugin") {
+                return@find true
+            } else if (dependency.name == "com.android.library.gradle.plugin") {
+                return@find true
+            } else if (dependency.group == "com.android.tools.build" && dependency.name == "gradle") {
+                return@find true
+            }
+            false
+        }?.version?.let { parseVersion(it) }
+        println("AndroidPlugin $agpVersion")
+        println("copyProject: $project, $plugin")
+        copyDependency(project, destDirectory, plugin, agpVersion)
+        copyDependency(project, destDirectory, plugin, agpVersion, "buildscript")
+    }
+
     if (project.tasks.findByName("copyDependencyToProject") == null) project.tasks.register("copyDependencyToProject") {
         doLast {
             val dir = project.layout.projectDirectory.file("repository").asFile
-            copyDependency(dir)
+            copyDependency(project, dir)
         }
     }
-
 
     if (project.tasks.findByName("copyDependencyToRootProject") == null) project.tasks.register("copyDependencyToRootProject") {
         doLast {
             val dir = rootProject.layout.projectDirectory.file("repository").asFile
-            copyDependency(dir)
+            copyDependency(project, dir)
         }
     }
 
@@ -163,7 +179,7 @@ allprojects {
         doLast {
             val repositoryPath = arrayOf(".m2", "repository").joinToString(File.separator)
             val dir = File(System.getProperty("user.home"), repositoryPath)
-            copyDependency(dir)
+            copyDependency(project, dir)
         }
     }
 }
