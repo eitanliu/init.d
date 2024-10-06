@@ -47,7 +47,7 @@ allprojects {
 
     fun copyDependency(
         project: Project, destDirectory: File, plugin: Plugin<*>?,
-        agpVersion: Comparable<Comparable<*>>?, tag: String = "project",
+        agpVersion: Comparable<Comparable<*>>?, tag: String = "project"
     ) {
         val ignoreDefault = (project.findProperty(
             "copy_dependency_ignore_default"
@@ -100,27 +100,27 @@ allprojects {
                     // println("resolvedDependency: $it, ${it::class.java.allSuperClass}")
                     interfaceMinimalExternalModuleDependency?.isInstance(it) ?: true
                 }.forEach { artifact ->
-                    val moduleVersionIdentifier = artifact.moduleVersion.id
+                    val moduleVersionId = artifact.moduleVersion.id
                     val ignoreList = listOf("org.jetbrains.kotlin:kotlin-native-prebuilt")
-                    val moduleName = moduleVersionIdentifier.module.toString()
-                    if (moduleName in ignoreList){ 
-                        println("ignoreArtifactModule: $moduleVersionIdentifier")
+                    val moduleName = moduleVersionId.module.toString()
+                    if (moduleName in ignoreList) {
+                        println("ignoreArtifactModule: $moduleVersionId")
                         return@forEach
                     }
                     val artifactPath = arrayOf(
-                        *moduleVersionIdentifier.group.split(".").toTypedArray(),
-                        moduleVersionIdentifier.name, moduleVersionIdentifier.version
+                        *moduleVersionId.group.split(".").toTypedArray(),
+                        moduleVersionId.name, moduleVersionId.version
                     )
 
                     val artifactDir = File(destDirectory, artifactPath.joinToString(File.separator))
                     if (!artifactDir.isDirectory) artifactDir.mkdirs()
 
-                    val cacheDir = artifact.file.parentFile.parentFile
-                    val cacheFiles = cacheDir.walk().filter {
-                        it.isFile && it.parentFile.path.contains(moduleVersionIdentifier.group)
+                    val cacheDir = artifact.file.parentFile?.parentFile
+                    val cacheFiles = cacheDir?.walk()?.filter {
+                        it.isFile && it.parentFile.path.contains(moduleVersionId.group)
                     }
-                    println("Find_Artifact: $name ${artifact.moduleVersion} Files: ${cacheFiles.joinToString()}")
-                    cacheFiles.forEach {
+                    println("Find_Artifact: $name ${artifact.moduleVersion} Files: ${cacheFiles?.joinToString()}")
+                    cacheFiles?.forEach {
                         val dest = File(artifactDir, it.name)
                         if (!dest.isFile) {
                             if (dest.exists()) dest.delete()
