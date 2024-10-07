@@ -9,6 +9,54 @@ Closure<Comparable> parseVersion = { String version ->
     return version
 }
 
+Closure<Boolean> checkErrorConnected = { URL url ->
+    //def proxy = new Proxy(Proxy.Type.SOCKS, new InetSocketAddress("127.0.0.1", 1080))
+    def connection = url.openConnection()
+    def time = System.currentTimeMillis()
+    try {
+        connection.connectTimeout = 3 * 1000
+        connection.connect()
+        // if (connection instanceof HttpURLConnection) {
+        //     def code = connection.responseCode
+        //     def fail = connection.responseCode in [404]
+        //     println "CheckErrorConnected: $fail, $code, ${System.currentTimeMillis() - time}, $url"
+        // }
+        println "CheckErrorConnected: false, ${System.currentTimeMillis() - time}, $url"
+        return false
+    } catch (Throwable e) {
+        println "CheckErrorConnected: true, ${e.message}, ${System.currentTimeMillis() - time}, $url"
+        return true
+    }
+}
+
+Closure handleRemoveRepo = { RepositoryHandler handler, boolean enable, Project project, String tag = "all" ->
+    if (!enable) return
+
+    handler.configure {
+        def iterator = handler.iterator()
+        while (iterator.hasNext()) {
+            def repo = iterator.next()
+            if (repo instanceof MavenArtifactRepository) {
+                println "handleRemoveRepo ${repo.url.scheme.contains("http")} ${repo.url}"
+                if (repo.url.scheme.contains("http")) {
+                    def url = repo.url.toURL()
+                    def isError = checkErrorConnected(url)
+                    if (isError) {
+                        try {
+                            // handler.removeIf { it.name == repo.name }
+                            iterator.remove()
+                            println "repo_maven_remove: $project $tag: $url."
+                        } catch (Throwable ignored) {
+                            println "repo_maven_remove_error: ${repo.name} $project $tag: $url."
+                            // ignored.printStackTrace()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 Closure handleAddRepo = { RepositoryHandler handler, URI repositoryUri, boolean enable, Project project, String tag = "all" ->
     if (enable && !handler.any { ArtifactRepository repo ->
         if (enable && repo instanceof MavenArtifactRepository) {
@@ -31,20 +79,25 @@ def localRepoUri = new File(System.getProperty("user.home"), localRepoPath).toUR
 allprojects {
     def rootRepoUri = project.rootProject.layout.projectDirectory.file("repository").asFile.toURI()
     def projectRepoUri = project.layout.projectDirectory.file("repository").asFile.toURI()
+
+    def removeErrorEnable = Boolean.valueOf(findProperty("repo_maven_remove_error")?.toString() ?: "false")
     def localEnable = Boolean.valueOf(findProperty("repo_maven_local")?.toString() ?: "true")
     def rootEnable = Boolean.valueOf(findProperty("repo_maven_root")?.toString() ?: "false")
     def projectEnable = Boolean.valueOf(findProperty("repo_maven_project")?.toString() ?: "false")
 
+    project.logger.lifecycle "$project repo_maven_remove_error $removeErrorEnable"
     project.logger.lifecycle "$project repo_maven_local $localEnable"
     project.logger.lifecycle "$project repo_maven_root $rootEnable"
     project.logger.lifecycle "$project repo_maven_project $projectEnable"
 
+    handleRemoveRepo(repositories, removeErrorEnable, project, "all")
     handleAddRepo(repositories, localRepoUri, localEnable, project, "all")
     handleAddRepo(repositories, rootRepoUri, rootEnable, project, "all")
     handleAddRepo(repositories, projectRepoUri, projectEnable, project, "all")
 
     buildscript {
 
+        handleRemoveRepo(repositories, removeErrorEnable, project, "buildscript")
         handleAddRepo(repositories, localRepoUri, localEnable, project, "buildscript")
         handleAddRepo(repositories, rootRepoUri, rootEnable, project, "buildscript")
         handleAddRepo(repositories, projectRepoUri, projectEnable, project, "buildscript")
@@ -55,9 +108,11 @@ gradle.beforeSettings { Settings settings ->
     // println "beforeSettings ${settings.properties}"
     def rootRepoUri = new File(settings.rootProject.projectDir, ["repository"].join(File.separator)).toURI()
 
+    def removeErrorEnable = Boolean.valueOf(settings.properties.getOrDefault("repo_maven_remove_error", "false") as String)
     def localEnable = Boolean.valueOf(settings.properties.getOrDefault("repo_maven_local", "true") as String)
     def rootEnable = Boolean.valueOf(settings.properties.getOrDefault("repo_maven_root", "false") as String)
     def pluginRepositories = settings.pluginManagement.repositories
+    handleRemoveRepo(pluginRepositories, removeErrorEnable, null, "pluginManagement")
     handleAddRepo(pluginRepositories, localRepoUri, localEnable, null, "pluginManagement")
     handleAddRepo(pluginRepositories, rootRepoUri, rootEnable, null, "pluginManagement")
 
@@ -67,6 +122,7 @@ gradle.beforeSettings { Settings settings ->
         def dependencyResolutionManagement = getMethod.invoke(settings)
         def repositoriesMethod = dependencyResolutionManagement.class.getDeclaredMethod("getRepositories")
         def repositories = repositoriesMethod.invoke(dependencyResolutionManagement) as RepositoryHandler
+        handleRemoveRepo(repositories, removeErrorEnable, null, "dependencyResolutionManagement")
         handleAddRepo(repositories, localRepoUri, localEnable, null, "dependencyResolutionManagement")
         handleAddRepo(repositories, rootRepoUri, rootEnable, null, "dependencyResolutionManagement")
     }
