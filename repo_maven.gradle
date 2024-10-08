@@ -52,14 +52,16 @@ allprojects {
 }
 
 gradle.beforeSettings { Settings settings ->
-    // println "beforeSettings ${settings.properties}"
+    // println "beforeSettings ${settings.rootProject.name} ${settings.properties}"
     def rootRepoUri = new File(settings.rootProject.projectDir, ["repository"].join(File.separator)).toURI()
 
     def localEnable = Boolean.valueOf(settings.properties.getOrDefault("repo_maven_local", "true") as String)
     def rootEnable = Boolean.valueOf(settings.properties.getOrDefault("repo_maven_root", "false") as String)
     def pluginRepositories = settings.pluginManagement.repositories
-    handleAddRepo(pluginRepositories, localRepoUri, localEnable, null, "pluginManagement")
-    handleAddRepo(pluginRepositories, rootRepoUri, rootEnable, null, "pluginManagement")
+    if (settings.rootProject.name != 'buildSrc') {
+        handleAddRepo(pluginRepositories, localRepoUri, localEnable, null, "pluginManagement")
+        handleAddRepo(pluginRepositories, rootRepoUri, rootEnable, null, "pluginManagement")
+    }
 
     // dependencyResolutionManagement.repositories
     if (parseVersion(gradle.gradleVersion) >= parseVersion("6.8")) {
