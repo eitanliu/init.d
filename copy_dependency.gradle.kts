@@ -1,5 +1,6 @@
 // apply(from = "copy_dependency.gradle.kts")
 // apply from: "repo_maven.gradle"
+// import org.gradle.api.internal.plugins.PluginManagerInternal
 import org.gradle.util.GradleVersion
 
 fun parseVersion(version: String): Comparable<Comparable<*>> {
@@ -58,8 +59,31 @@ allprojects {
         } else {
             project.buildscript.configurations
         }
+        val version = plugin?.let { _ ->
+            // val pluginId = plugin.javaClass.name
+            // val pm = project.pluginManager as PluginManagerInternal
+            // val pluginId = pm.findPluginIdForClass(plugin::class.java).get()
+            // println("PluginId: $plugin, ${pluginId.id}")
+            val pluginVersion = plugin.javaClass.classLoader
+                // .getResource("META-INF/gradle-plugins/${pluginId.id}.properties")
+                .getResource("META-INF/MANIFEST.MF")
+                ?.readText()
+                // ?.let { text -> Regex("version=(.*)").find(text)?.groupValues?.get(1) }
+                ?.let { text ->
+                    Regex("Plugin\\-Version\\:(.*)").find(text)?.groupValues?.get(1)?.trim()
+                }
+                ?: try {
+                    val versionField = plugin.javaClass.getDeclaredField("VERSION")
+                    versionField.isAccessible = true
+                    versionField.get(null) as? String
+                } catch (_: Throwable) {
+                    null
+                }
+            pluginVersion
+        }
+        println("PluginVersion: $project $version $plugin")
         container.all {
-            println("$tag.configuration: $isCanBeResolved, $isCanBeConsumed, ${this.name}.")
+            println("$tag.configuration: $name, $isCanBeResolved, $isCanBeConsumed")
 
             if (isCanBeResolved && !resolvedConfiguration.hasError()) {
                 println("resolvedConfiguration: ${resolvedConfiguration.hasError()}, $resolvedConfiguration")
