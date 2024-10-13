@@ -26,3 +26,11 @@ static List<Class> allSuperClass(Class clazz) {
     }
     return classList
 }
+
+Closure<String> systemEnv = { String key ->
+    return System.getenv(key)
+}
+
+Closure<String> property = { String key, Project project = null ->
+    return project?.findProperty(key)?.toString() ?: System.getProperty(key)
+}
