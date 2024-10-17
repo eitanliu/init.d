@@ -32,5 +32,5 @@ val Class<*>.allSuperClass: List<Class<*>>
 
 fun systemEnv(key: String): String? = System.getenv(key)
 
-fun property(key: String, project: Project? = null): String =
+fun projProp(key: String, project: Project? = null): String =
     project?.findProperty(key)?.toString() ?: System.getProperty(key)
