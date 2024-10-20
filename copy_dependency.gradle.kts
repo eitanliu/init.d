@@ -185,25 +185,28 @@ allprojects {
         copyDependency(project, destDirectory, plugin, agpVersion, "buildscript")
     }
 
-    if (project.tasks.findByName("copyDependencyToProject") == null) project.tasks.register("copyDependencyToProject") {
-        doLast {
-            val dir = project.layout.projectDirectory.file("repository").asFile
-            copyDependency(project, dir)
+    if (project.tasks.findByName("copyDependencyToProject") == null)
+        project.tasks.register("copyDependencyToProject") {
+            doLast {
+                val dir = project.layout.projectDirectory.file("repository").asFile
+                copyDependency(project, dir)
+            }
         }
-    }
 
-    if (project.tasks.findByName("copyDependencyToRootProject") == null) project.tasks.register("copyDependencyToRootProject") {
-        doLast {
-            val dir = rootProject.layout.projectDirectory.file("repository").asFile
-            copyDependency(project, dir)
+    if (project.tasks.findByName("copyDependencyToRootProject") == null)
+        project.tasks.register("copyDependencyToRootProject") {
+            doLast {
+                val dir = rootProject.layout.projectDirectory.file("repository").asFile
+                copyDependency(project, dir)
+            }
         }
-    }
 
-    if (project.tasks.findByName("copyDependencyToMavenLocal") == null) project.tasks.register("copyDependencyToMavenLocal") {
-        doLast {
-            val repositoryPath = arrayOf(".m2", "repository").joinToString(File.separator)
-            val dir = File(System.getProperty("user.home"), repositoryPath)
-            copyDependency(project, dir)
+    if (project.tasks.findByName("copyDependencyToMavenLocal") == null)
+        project.tasks.register("copyDependencyToMavenLocal") {
+            doLast {
+                val repositoryPath = arrayOf(".m2", "repository").joinToString(File.separator)
+                val dir = File(System.getProperty("user.home"), repositoryPath)
+                copyDependency(project, dir)
+            }
         }
-    }
 }

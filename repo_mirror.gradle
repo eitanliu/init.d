@@ -105,10 +105,12 @@ allprojects {
     }
 }
 
-gradle.beforeSettings { settings ->
+gradle.beforeSettings { Settings settings ->
     // println "beforeSettings ${settings.properties}"
     // def mirrorEnable = true;
-    def mirrorEnable = Boolean.valueOf(settings.properties.getOrDefault("repo_mirror_enable", "true") as String);
+    def props = settings.extensions.extraProperties
+    def mirrorEnable = Boolean.valueOf(props.has("repo_mirror_enable") ? props.get("repo_mirror_enable") : "true");
+    println "beforeSettings repo_mirror_enable ${mirrorEnable}"
     handleMirrorRepo(settings.pluginManagement.repositories, mirrorEnable, null, "pluginManagement")
     // 6.8 及更高版本执行 DependencyResolutionManagement 配置
     // dependencyResolutionManagement.repositories

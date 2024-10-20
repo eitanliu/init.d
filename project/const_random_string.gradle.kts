@@ -103,8 +103,8 @@ fun constSaveHistory() {
 }
 
 tasks.apply {
-    if (tasks.findByName("constRandomString") == null)
+    if (findByName("constRandomString") == null)
         register("constRandomString") { doLast { constRandomString() } }
-    if (tasks.findByName("constSaveHistory") == null)
+    if (findByName("constSaveHistory") == null)
         register("constSaveHistory") { doLast { constSaveHistory() } }
 }
