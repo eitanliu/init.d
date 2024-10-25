@@ -105,7 +105,8 @@ allprojects {
     }
 }
 
-gradle.beforeSettings { Settings settings ->
+def hasBeforeSettings = gradle.class.methods.any { it.name == "beforeSettings" }
+if(hasBeforeSettings) gradle.beforeSettings { Settings settings ->
     // println "beforeSettings ${settings.properties}"
     // def mirrorEnable = true;
     def props = settings.extensions.extraProperties

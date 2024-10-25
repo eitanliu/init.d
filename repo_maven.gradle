@@ -51,7 +51,8 @@ allprojects {
     }
 }
 
-gradle.beforeSettings { Settings settings ->
+def hasBeforeSettings = gradle.class.methods.any { it.name == "beforeSettings" }
+if(hasBeforeSettings) gradle.beforeSettings { Settings settings ->
     // println "beforeSettings ${settings.rootProject.name} ${settings.properties}"
     def rootRepoUri = new File(settings.rootProject.projectDir, ["repository"].join(File.separator)).toURI()
 

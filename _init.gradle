@@ -42,7 +42,8 @@ allprojects {
     println("Project.props $project ===> ${project.getProperties()}")
 }
 
-gradle.beforeSettings { Settings settings ->
+def hasBeforeSettings = gradle.class.methods.any { it.name == "beforeSettings" }
+if(hasBeforeSettings) gradle.beforeSettings { Settings settings ->
     println("beforeSettings gradle.startParameter ${gradle.startParameter}")
     println "beforeSettings gradle.properties ${gradle.properties}"
     println "beforeSettings gradle.extra ${gradle.extensions.extraProperties.properties}"
