@@ -10,17 +10,22 @@ Closure<Comparable> parseVersion = { String version ->
 }
 
 Closure handleAddRepo = { RepositoryHandler handler, URI repositoryUri, boolean enable, Project project, String tag = "all" ->
-    if (enable && !handler.any { ArtifactRepository repo ->
-        if (enable && repo instanceof MavenArtifactRepository) {
-            return repositoryUri == repo.url
-        } else return false
-    }) {
-        try {
-            handler.maven { url = repositoryUri }
-            println "repo_maven_add $project $tag: $repositoryUri."
-        } catch (Throwable e) {
-            println "repo_maven_error $project $tag: $repositoryUri."
-            // e.printStackTrace()
+    if(!enable) return
+    def isAdded = false
+    handler.configureEach {
+        if (enable && !isAdded && !handler.any { ArtifactRepository repo ->
+            if (repo instanceof MavenArtifactRepository) {
+                return repositoryUri == repo.url
+            } else return false
+        }) {
+            isAdded = true
+            try {
+                handler.maven { url = repositoryUri }
+                println "repo_maven_add $project $tag: $repositoryUri."
+            } catch (Throwable e) {
+                println "repo_maven_error $project $tag: $repositoryUri."
+                // e.printStackTrace()
+            }
         }
     }
 }
@@ -31,7 +36,7 @@ def localRepoUri = new File(System.getProperty("user.home"), localRepoPath).toUR
 allprojects {
     def rootRepoUri = project.rootProject.layout.projectDirectory.file("repository").asFile.toURI()
     def projectRepoUri = project.layout.projectDirectory.file("repository").asFile.toURI()
-    def localEnable = Boolean.valueOf(findProperty("repo_maven_local")?.toString() ?: "true")
+    def localEnable = Boolean.valueOf(findProperty("repo_maven_local")?.toString() ?: "false")
     def rootEnable = Boolean.valueOf(findProperty("repo_maven_root")?.toString() ?: "false")
     def projectEnable = Boolean.valueOf(findProperty("repo_maven_project")?.toString() ?: "false")
 
@@ -52,11 +57,11 @@ allprojects {
 }
 
 def hasBeforeSettings = gradle.class.methods.any { it.name == "beforeSettings" }
-if(hasBeforeSettings) gradle.beforeSettings { Settings settings ->
+if (hasBeforeSettings) gradle.beforeSettings { Settings settings ->
     // println "beforeSettings ${settings.rootProject.name} ${settings.properties}"
     def rootRepoUri = new File(settings.rootProject.projectDir, ["repository"].join(File.separator)).toURI()
 
-    def localEnable = Boolean.valueOf(settings.properties.getOrDefault("repo_maven_local", "true") as String)
+    def localEnable = Boolean.valueOf(settings.properties.getOrDefault("repo_maven_local", "false") as String)
     def rootEnable = Boolean.valueOf(settings.properties.getOrDefault("repo_maven_root", "false") as String)
     def pluginRepositories = settings.pluginManagement.repositories
     if (settings.rootProject.name != 'buildSrc') {
