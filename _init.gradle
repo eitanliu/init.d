@@ -50,3 +50,5 @@ if(hasBeforeSettings) gradle.beforeSettings { Settings settings ->
     println "beforeSettings settings.props ${settings.properties}"
     println "beforeSettings settings.extra ${settings.extensions.extraProperties.properties}"
 }
+
+// apply from: '_init/copy_dependency.gradle.kts'
